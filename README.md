@@ -141,6 +141,19 @@ You can use this program to control the robot directly, but make sure the on-bor
 ./g1_ctrl --network eth0 # eth0 is the network interface name.
 ```
 
+Custom Joystick
+
+```bash
+# Use default /dev/input/js0
+./g1_ctrl --network enp5s0 --custom-joystick
+
+# Use a specific device
+./g1_ctrl --network enp5s0 --custom-joystick /dev/input/js1
+
+# Without the flag — behavior is unchanged (DDS joystick only)
+./g1_ctrl --network enp5s0
+```
+
 ## Acknowledgements
 
 This repository is built upon the support and contributions of the following open-source projects. Special thanks to:

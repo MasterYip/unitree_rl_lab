@@ -5,6 +5,7 @@
 #include "FSM/BaseState.h"
 #include "isaaclab/devices/keyboard/keyboard.h"
 #include "unitree_joystick_dsl.hpp"
+#include "common/CustomJoystick.h"
 
 namespace fsm_debug {
 
@@ -181,6 +182,12 @@ public:
     void pre_run()
     {
         lowstate->update();
+        // Override joystick state with custom device if enabled
+        if (!param::custom_joystick.empty()) {
+            static CustomJoystick custom_joy(param::custom_joystick);
+            custom_joy.poll();
+            custom_joy.apply_to(lowstate->joystick);
+        }
         // fsm_debug::log_joystick_state(lowstate->joystick);
         if(keyboard) keyboard->update();
     }

@@ -43,6 +43,7 @@ inline std::filesystem::path bin_path;
 inline std::filesystem::path proj_dir;
 inline std::filesystem::path config_dir;
 inline YAML::Node config;
+inline std::string custom_joystick = "";
 
 inline std::filesystem::path get_bin_path() {
     std::vector<char> path(1024);
@@ -130,6 +131,7 @@ inline po::variables_map helper(int argc, char** argv)
         ("version,v", "show version")
         ("log", "record log file")
         ("network,n", po::value<std::string>()->default_value(""), "dds network interface")
+        ("custom-joystick", po::value<std::string>()->implicit_value("/dev/input/js0"), "use custom joystick device (default: /dev/input/js0)")
         ;
 
     po::variables_map vm;
@@ -156,6 +158,10 @@ inline po::variables_map helper(int argc, char** argv)
     {
         std::filesystem::create_directories(proj_dir / "log");
         spdlog::create_logger(proj_dir.string() + "/log/log.txt");
+    }
+    if(vm.count("custom-joystick"))
+    {
+        param::custom_joystick = vm["custom-joystick"].as<std::string>();
     }
 
     return vm;
