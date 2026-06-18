@@ -121,11 +121,12 @@ Installing the [unitree_mujoco](https://github.com/unitreerobotics/unitree_mujoc
 cd unitree_mujoco/simulate/build
 cd /home/user/CodeSpace/Diffusion/PegasusMoDye/deps/deploy/unitree_mujoco/simulate/build
 ./unitree_mujoco
-# ./unitree_mujoco -i 0 -n eth0 -r g1 -s scene_29dof.xml # alternative
+# ./unitree_mujoco -i 0 -n lo -r g1 -s scene_29dof.xml # alternative
 ```
 
 ```bash
 cd unitree_rl_lab/deploy/robots/g1_29dof/build
+cd ./deploy/robots/g1_29dof/build
 ./g1_ctrl --network lo
 # 1. press [L2 + Up] to set the robot to stand up
 # 2. Click the mujoco window, and then press 8 to make the robot feet touch the ground.
