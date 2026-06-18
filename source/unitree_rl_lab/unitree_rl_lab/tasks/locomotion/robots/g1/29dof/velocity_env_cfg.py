@@ -404,3 +404,8 @@ class RobotPlayEnvCfg(RobotEnvCfg):
         self.scene.terrain.terrain_generator.num_rows = 2
         self.scene.terrain.terrain_generator.num_cols = 10
         self.commands.base_velocity.ranges = self.commands.base_velocity.limit_ranges
+
+        # Reduce GPU buffer sizes for laptop GPUs
+        self.sim.physx.gpu_max_rigid_patch_count = 2 * 2**15  # was 10 * 2**15
+        self.sim.physx.gpu_max_rigid_contact_count = 2**21     # was 2**23
+        self.sim.physx.gpu_collision_stack_size = 2**24        # was 2**26
