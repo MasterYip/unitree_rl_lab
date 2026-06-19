@@ -145,6 +145,7 @@ You can use this program to control the robot directly, but make sure the on-bor
 Custom Joystick
 
 ```bash
+cd ./deploy/robots/g1_29dof/build
 # Use default /dev/input/js0
 ./g1_ctrl --network enp5s0 --custom-joystick
 
