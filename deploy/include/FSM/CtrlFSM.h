@@ -7,6 +7,7 @@
 #include "BaseState.h"
 #include <spdlog/spdlog.h>
 #include <yaml-cpp/yaml.h>
+#include "FSMState.h"
 
 class CtrlFSM
 {
@@ -45,17 +46,38 @@ public:
         }
     }
 
-    void start() 
-    {
+    // void start() 
+    // {
+    //     // Start From State_Passive
+    //     currentState = states[0];
+    //     currentState->enter();
+
+    //     fsm_thread_ = std::make_shared<unitree::common::RecurrentThread>(
+    //         "FSM", 0, this->dt * 1e6, &CtrlFSM::run_, this);
+    //     spdlog::info("FSM: Start {}", currentState->getStateString());
+    // }
+    void start(){
         // Start From State_Passive
         currentState = states[0];
-        currentState->enter();
-
+         std::cout << "\n========== 已加载的状态列表 ==========" << std::endl;
+        for (const auto& state : states) {
+            if (state != nullptr) {
+                // _state_mode 是 ID，_state_string 是名称
+                std::cout << "状态 ID: " << state->getState() 
+                        << " | 状态名称: " << state->getStateString() << std::endl;
+            }
+        }
+        std::cout << "====================================\n" << std::endl;
+        // currentState->enter();
+        // currentState = states[1];
+        // currentState->enter();
+        // currentState = states[2];
+        // currentState->enter();
+       
         fsm_thread_ = std::make_shared<unitree::common::RecurrentThread>(
             "FSM", 0, this->dt * 1e6, &CtrlFSM::run_, this);
         spdlog::info("FSM: Start {}", currentState->getStateString());
-    }
-
+}
     void add(std::shared_ptr<BaseState> state)
     {
         for(auto & s : states)
@@ -79,23 +101,74 @@ public:
 private:
     const double dt = 0.001;
 
+    // void run_()
+    // {
+    //     currentState->pre_run();
+    //     currentState->run();
+    //     currentState->post_run();
+        
+    //     // Check if need to change state
+    //     int nextStateMode = 0;
+    //     for(int i(0); i<currentState->registered_checks.size(); i++)
+    //     {
+    //         if(currentState->registered_checks[i].first())
+    //         {
+    //             nextStateMode = currentState->registered_checks[i].second;
+    //             break;
+    //         }
+    //     }
+
+    //     if(nextStateMode != 0 && !currentState->isState(nextStateMode))
+    //     {
+    //         for(auto & state : states)
+    //         {
+    //             if(state->isState(nextStateMode))
+    //             {
+    //                 spdlog::info("FSM: Change state from {} to {}", currentState->getStateString(), state->getStateString());
+    //                 currentState->exit();
+    //                 currentState = state;
+    //                 currentState->enter();
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
+
     void run_()
     {
         currentState->pre_run();
         currentState->run();
         currentState->post_run();
-        
+
         // Check if need to change state
         int nextStateMode = 0;
-        for(int i(0); i<currentState->registered_checks.size(); i++)
-        {
-            if(currentState->registered_checks[i].first())
-            {
-                nextStateMode = currentState->registered_checks[i].second;
-                break;
-            }
+        // for(int i(0); i<currentState->registered_checks.size(); i++)
+        // {
+        //     if(currentState->registered_checks[i].first())
+        //     {
+        //         nextStateMode = currentState->registered_checks[i].second;
+        //         break;
+        //     }
+        // }
+        // std::cout << "// ========== 已加载的状态列表 ==========
+        //                 // 状态 ID: 1 | 状态名称: Passive
+        //                 // 状态 ID: 2 | 状态名称: FixStand
+        //                 // 状态 ID: 3 | 状态名称: Velocity
+        //                 // 状态 ID: 101 | 状态名称: Mimic_Dance_102
+        //                 // 状态 ID: 102 | 状态名称: Mimic_Gangnam_Style
+        //                 // ====================================" << std::endl;
+        // --- 方案 B：添加非阻塞键盘手动切换（用于调试） ---
+        // std::cout << "Press [1] for Passive, [2] for FixStand, [3] for Velocity, [8] for Mimic_Dance_102, [9] for Mimic_Gangnam_Style" << std::endl;
+        std::string key = FSMState::keyboard->key();
+        if (!key.empty()) {
+            // 使用键盘数字键 1, 2, 3... 切换状态
+            if (key == "1") nextStateMode = 1;   // Passive
+            else if (key == "2") nextStateMode = 2; // FixStand
+            else if (key == "3") nextStateMode = 3; // Velocity
+            else if (key == "8") nextStateMode = 101; // Mimic 1
+            else if (key == "9") nextStateMode = 102; // Mimic 2
         }
-
+        // std::cin >> nextStateMode; // 通过控制台输入切换状态，适合调试
         if(nextStateMode != 0 && !currentState->isState(nextStateMode))
         {
             for(auto & state : states)
