@@ -3,183 +3,133 @@
 
 #pragma once
 
-#include <fcntl.h>
-#include <unistd.h>
-#include <linux/joystick.h>
-#include <array>
 #include <string>
 #include <cmath>
 #include <algorithm>
 #include <spdlog/spdlog.h>
 #include "unitree/dds_wrapper/common/unitree_joystick.hpp"
+#include "common/joystick_parser.hpp"
 
-/// @brief Reads a standard gamepad from /dev/input/jsX and overrides
-///        a UnitreeJoystick state. Uses the Linux joystick API with
-///        non-blocking I/O so it is safe to call inside the 1 ms FSM loop.
+/// @brief Reads a standard gamepad from /dev/input/jsX and overrides a
+///        unitree::common::UnitreeJoystick state with the captured input.
 ///
-/// Standard gamepad mapping (matches DEFAULT_AXIS_NAMES / DEFAULT_BUTTON_NAMES):
+/// Uses joystick::JoystickParser (a standalone header-only Linux js* reader)
+/// for device I/O and logical-name resolution.  The adapter maps logical
+/// axis / button names (e.g. "left_x", "south") onto the Unitree joystick API.
+///
+/// Standard Xbox mapping (built into JoystickParser):
 ///
 ///   Axes:
-///     0 = left_x   → lx     [-1, 1]
-///     1 = left_y   → ly     [-1, 1]  (inverted on most gamepads)
-///     2 = l2       → LT     [0, 1]   (auto-calibrated trigger)
-///     3 = right_x  → rx     [-1, 1]
-///     4 = right_y  → ry     [-1, 1]  (inverted on most gamepads)
-///     5 = r2       → RT     [0, 1]   (auto-calibrated trigger)
-///     6 = dpad_x   → left/right      (-1=left, 0=neutral, +1=right)
-///     7 = dpad_y   → up/down         (-1=up,  0=neutral, +1=down)
+///     left_x   → lx     [-1, 1]
+///     left_y   → ly     [-1, 1]  (inverted — up is positive in Unitree)
+///     l2       → LT     [0, 1]   (auto-calibrated trigger)
+///     right_x  → rx     [-1, 1]
+///     right_y  → ry     [-1, 1]  (inverted)
+///     r2       → RT     [0, 1]   (auto-calibrated trigger)
+///     dpad_x   → left / right    (-1 / 0 / +1)
+///     dpad_y   → up / down       (-1 / 0 / +1)
 ///
 ///   Buttons:
-///     0 = A, 1 = B, 2 = X, 3 = Y
-///     4 = L1 (→LB),  5 = R1 (→RB)
-///     6 = Select (→back), 7 = Start (→start)
-///     8 = Mode (unmapped)
-///     9 = L3 (→LS), 10 = R3 (→RS)
-///     (11-14 = dpad buttons, also checked as fallback)
+///     south→A, east→B, west→X, north→Y
+///     l1→LB, r1→RB
+///     select→back, start→start
+///     l3→LS, r3→RS
 class CustomJoystick
 {
 public:
-    CustomJoystick(const std::string& device = "/dev/input/js0")
+    /// @param device  Path to the joystick device, e.g. "/dev/input/js0".
+    /// @param mapping Optional mapping config pointer.  If nullptr, the
+    ///                built-in Xbox mapping is used.
+    explicit CustomJoystick(const std::string& device = "/dev/input/js0",
+                            const joystick::JoystickMappingConfig* mapping = nullptr)
+        : parser_(device, mapping ? mapping : &joystick::get_mapping("xbox"))
     {
-        fd_ = open(device.c_str(), O_RDONLY | O_NONBLOCK);
-        if (fd_ < 0) {
-            spdlog::warn("CustomJoystick: failed to open '{}' ({}). "
-                         "Is the gamepad connected?", device, strerror(errno));
+        if (!parser_.is_connected()) {
+            spdlog::warn("CustomJoystick: failed to open '{}'. "
+                         "Is the gamepad connected?", device);
         } else {
             spdlog::info("CustomJoystick: reading from '{}'", device);
         }
     }
 
-    ~CustomJoystick()
-    {
-        if (fd_ >= 0) {
-            close(fd_);
-        }
-    }
+    bool is_connected() const { return parser_.is_connected(); }
 
-    bool is_connected() const { return fd_ >= 0; }
+    /// Read all pending js_event structs. Non-blocking — safe to call inside
+    /// the 1 ms FSM loop.
+    void poll() { parser_.poll(); }
 
-    /// Read all pending js_event structs. Safe to call at >1 kHz.
-    void poll()
-    {
-        if (fd_ < 0) return;
-
-        struct js_event ev;
-        ssize_t n;
-        while ((n = read(fd_, &ev, sizeof(ev))) == sizeof(ev)) {
-            switch (ev.type & ~JS_EVENT_INIT) {
-            case JS_EVENT_BUTTON:
-                if (ev.number < static_cast<int>(buttons_.size())) {
-                    buttons_[ev.number] = ev.value;
-                }
-                break;
-            case JS_EVENT_AXIS:
-                if (ev.number < static_cast<int>(axis_raw_.size())) {
-                    axis_raw_[ev.number] = ev.value;
-
-                    // Normalise joystick axes (0,1,3,4) to [-1, 1]
-                    if (ev.number == 0 || ev.number == 1 ||
-                        ev.number == 3 || ev.number == 4) {
-                        axes_[ev.number] = std::clamp(
-                            ev.value / 32767.0f, -1.0f, 1.0f);
-                    }
-                    // Auto-calibrate trigger axes (2=l2, 5=r2)
-                    if (ev.number == 2) {
-                        l2_min_ = std::min(l2_min_, static_cast<float>(ev.value));
-                        l2_max_ = std::max(l2_max_, static_cast<float>(ev.value));
-                    }
-                    if (ev.number == 5) {
-                        r2_min_ = std::min(r2_min_, static_cast<float>(ev.value));
-                        r2_max_ = std::max(r2_max_, static_cast<float>(ev.value));
-                    }
-                    // D-pad axes (6=dpad_x, 7=dpad_y) — discrete: -32767/0/+32767
-                    if (ev.number == 6) {
-                        dpad_x_ = (ev.value > 16384) ? 1 :
-                                  (ev.value < -16384) ? -1 : 0;
-                    }
-                    if (ev.number == 7) {
-                        dpad_y_ = (ev.value > 16384) ? 1 :
-                                  (ev.value < -16384) ? -1 : 0;
-                    }
-                }
-                break;
-            default:
-                break;
-            }
-        }
-
-        // Compute normalised trigger values [0, 1] from calibrated range
-        auto norm_trigger = [](float raw, float lo, float hi) -> float {
-            if (hi - lo < 1.0f) return 0.0f;
-            return std::clamp((raw - lo) / (hi - lo), 0.0f, 1.0f);
-        };
-        axes_[2] = norm_trigger(axis_raw_[2], l2_min_, l2_max_);
-        axes_[5] = norm_trigger(axis_raw_[5], r2_min_, r2_max_);
-    }
-
-    /// Override every button / axis on `joystick` with the latest js0 state.
-    /// The Unitree "extract"-style operator() methods handle edge detection
-    /// (on_pressed / on_released) and axis deadband / smoothing internally.
+    /// Override every button / axis on @p joystick with the latest gamepad
+    /// state.  The Unitree "extract"-style operator() methods handle edge
+    /// detection (on_pressed / on_released) and axis deadband / smoothing
+    /// internally.
     void apply_to(unitree::common::UnitreeJoystick& joystick)
     {
-        if (fd_ < 0) return;
+        if (!parser_.is_connected()) return;
 
-        // --- axes (ly/ry are inverted on most gamepads) ---
-        joystick.lx(axes_[0]);
-        joystick.ly(-axes_[1]);
-        joystick.LT(axes_[2]);
-        joystick.rx(axes_[3]);
-        joystick.ry(-axes_[4]);
-        joystick.RT(axes_[5]);
+        // -- stick axes (normalised to [-1, 1], Y-inverted) --
+        joystick.lx( get_stick("left_x") );
+        joystick.ly(-get_stick("left_y") );
+        joystick.rx( get_stick("right_x") );
+        joystick.ry(-get_stick("right_y") );
 
-        // --- d-pad: primary source is axes 6/7, fallback to buttons 11-14 ---
-        bool up    = (dpad_y_ == -1) || (buttons_[11] != 0);
-        bool down  = (dpad_y_ ==  1) || (buttons_[12] != 0);
-        bool left  = (dpad_x_ == -1) || (buttons_[13] != 0);
-        bool right = (dpad_x_ ==  1) || (buttons_[14] != 0);
+        // -- triggers (auto-calibrated to [0, 1]) --
+        joystick.LT( get_trigger("l2", l2_min_, l2_max_) );
+        joystick.RT( get_trigger("r2", r2_min_, r2_max_) );
+
+        // -- d-pad (primary: dpad_x / dpad_y axes; fallback: buttons 11-14) --
+        int dpad_x = parser_.get_axis_raw("dpad_x");
+        int dpad_y = parser_.get_axis_raw("dpad_y");
+        bool up    = (dpad_y < 0) || parser_.get_button_by_number(11);
+        bool down  = (dpad_y > 0) || parser_.get_button_by_number(12);
+        bool left  = (dpad_x < 0) || parser_.get_button_by_number(13);
+        bool right = (dpad_x > 0) || parser_.get_button_by_number(14);
         joystick.up(up ? 1 : 0);
         joystick.down(down ? 1 : 0);
         joystick.left(left ? 1 : 0);
         joystick.right(right ? 1 : 0);
 
-        // --- face buttons ---
-        joystick.A(buttons_[0]);
-        joystick.B(buttons_[1]);
-        joystick.X(buttons_[2]);
-        joystick.Y(buttons_[3]);
+        // -- face buttons --
+        joystick.A(parser_.get_button("south") ? 1 : 0);
+        joystick.B(parser_.get_button("east")  ? 1 : 0);
+        joystick.X(parser_.get_button("west")  ? 1 : 0);
+        joystick.Y(parser_.get_button("north") ? 1 : 0);
 
-        // --- bumpers (L1=LB, R1=RB) ---
-        joystick.LB(buttons_[4]);
-        joystick.RB(buttons_[5]);
+        // -- bumpers (L1→LB, R1→RB) --
+        joystick.LB(parser_.get_button("l1") ? 1 : 0);
+        joystick.RB(parser_.get_button("r1") ? 1 : 0);
 
-        // --- menu buttons (Select=back) ---
-        joystick.back(buttons_[6]);
-        joystick.start(buttons_[7]);
+        // -- menu buttons --
+        joystick.back(parser_.get_button("select") ? 1 : 0);
+        joystick.start(parser_.get_button("start") ? 1 : 0);
 
-        // --- stick clicks (L3=LS, R3=RS) ---
-        joystick.LS(buttons_[9]);
-        joystick.RS(buttons_[10]);
+        // -- stick clicks --
+        joystick.LS(parser_.get_button("l3") ? 1 : 0);
+        joystick.RS(parser_.get_button("r3") ? 1 : 0);
     }
 
 private:
-    int fd_ = -1;
+    /// Normalise a stick axis to [-1, 1] using the standard signed-16-bit
+    /// joystick range.
+    static float get_stick(int raw) {
+        return std::clamp(raw / 32767.0f, -1.0f, 1.0f);
+    }
+    float get_stick(const char* logical) {
+        return get_stick(parser_.get_axis_raw(logical));
+    }
 
-    /// Normalised joystick axis values (0=lx, 1=ly, 2=LT, 3=rx, 4=ry, 5=RT, 6/7 unused)
-    std::array<float, 8> axes_{};
+    /// Auto-calibrate and normalise a trigger axis to [0, 1].
+    float get_trigger(const char* logical, float& lo, float& hi) {
+        float raw = static_cast<float>(parser_.get_axis_raw(logical));
+        lo = std::min(lo, raw);
+        hi = std::max(hi, raw);
+        if (hi - lo < 1.0f) return 0.0f;
+        return std::clamp((raw - lo) / (hi - lo), 0.0f, 1.0f);
+    }
 
-    /// Raw axis values for trigger auto-calibration
-    std::array<float, 8> axis_raw_{};
+    joystick::JoystickParser parser_;
 
-    /// Button state (0 = released, 1 = pressed)
-    std::array<int, 16> buttons_{};
-
-    /// D-pad discrete values from axes 6 (dpad_x) and 7 (dpad_y): -1, 0, or +1
-    int dpad_x_ = 0;
-    int dpad_y_ = 0;
-
-    /// Auto-calibration range for l2 (axis 2)
+    /// Auto-calibration range for l2 (left trigger)
     float l2_min_{0.0f}, l2_max_{32767.0f};
-
-    /// Auto-calibration range for r2 (axis 5)
+    /// Auto-calibration range for r2 (right trigger)
     float r2_min_{0.0f}, r2_max_{32767.0f};
 };
