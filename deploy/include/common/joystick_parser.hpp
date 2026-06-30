@@ -515,16 +515,14 @@ private:
     /// Drain synthetic INIT events that the kernel emits on open().
     /// Called once from the constructor while we still own the fd exclusively.
     void drain_init_events() {
+        // The fd is already O_NONBLOCK.  Kernel INIT events are flushed
+        // synchronously inside open(), so they are available immediately.
+        // We drain them with non-blocking reads — no need to switch to
+        // blocking mode (which would hang after the last INIT event).
         struct js_event ev;
-        // Temporarily switch to blocking so we catch all INIT events.
-        int flags = ::fcntl(fd_, F_GETFL, 0);
-        ::fcntl(fd_, F_SETFL, flags & ~O_NONBLOCK);
-
-        // Read up to (kMaxAxes + kMaxButtons) INIT events.  Most kernels
-        // flush them all immediately after open.
         for (int attempt = 0; attempt < kMaxAxes + kMaxButtons; ++attempt) {
             ssize_t n = ::read(fd_, &ev, sizeof(ev));
-            if (n != static_cast<ssize_t>(sizeof(ev))) break;
+            if (n != static_cast<ssize_t>(sizeof(ev))) break; // EAGAIN or EOF
 
             const uint8_t base = ev.type & ~JS_EVENT_INIT_MASK;
             if (base == JS_EVENT_AXIS_MASK && ev.number < kMaxAxes) {
@@ -533,9 +531,6 @@ private:
                 buttons_[ev.number] = ev.value;
             }
         }
-
-        // Restore non-blocking mode.
-        ::fcntl(fd_, F_SETFL, flags);
     }
 
     /// Normalise a raw axis value to ``[0,1]`` or ``[-1,1]``.
