@@ -95,12 +95,17 @@ Then deploy sim2real.
 ```bash
 # Install dependencies
 sudo apt install -y libyaml-cpp-dev libboost-all-dev libeigen3-dev libspdlog-dev libfmt-dev
-# Install unitree_sdk2
+# Install unitree_sdk2 (C++)
 git clone git@github.com:unitreerobotics/unitree_sdk2.git
 cd unitree_sdk2
 mkdir build && cd build
 cmake .. -DBUILD_EXAMPLES=OFF # Install on the /usr/local directory
 sudo make install
+# Install unitree_sdk2_py (Python bindings)
+git clone git@github.com:unitreerobotics/unitree_sdk2_python.git
+cd unitree_sdk2_python
+pip install cyclonedds==0.10.2 numpy opencv-python matplotlib
+pip install -e .
 # Compile the robot_controller
 cd unitree_rl_lab/deploy/robots/g1_29dof # or other robots
 mkdir build && cd build
@@ -155,6 +160,35 @@ cd ./deploy/robots/g1_29dof/build
 # Without the flag — behavior is unchanged (DDS joystick only)
 ./g1_ctrl --network enp5s0
 ```
+
+### Robot State Visualization
+
+A live matplotlib dashboard for monitoring the G1's joint positions, velocities, and IMU orientation in real time via DDS.
+
+```bash
+# Install Python dependencies
+pip install matplotlib numpy
+
+# Run the visualizer
+cd deploy/robots/g1_29dof/tests
+python vis_g1_state.py --network enp5s0
+
+# For HiDPI / 4K screens:
+python vis_g1_state.py --network enp5s0 --scale 1.5
+
+# For simulation (loopback):
+python vis_g1_state.py --network lo
+```
+
+The dashboard shows:
+
+- **IMU attitude** — roll/pitch/yaw gauge with real-time orientation
+- **Joint positions** — horizontal bar chart of all 29 joint angles (q)
+- **Joint velocities** — horizontal bar chart of all 29 joint speeds (dq)
+- **History traces** — rolling plot of IMU R/P/Y over time
+- **Status bar** — tick count, control mode, FPS
+
+Press `q` or close the window to exit.
 
 ## Acknowledgements
 
