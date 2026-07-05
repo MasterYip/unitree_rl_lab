@@ -168,10 +168,10 @@ Use these scripts to install or remove a systemd unit that runs `./g1_ctrl --net
 
 ```bash
 cd deploy/scripts
-./enable_g1_ctrl_autostart.sh
-./enable_g1_ctrl_autostart.sh --delay-seconds 30
-./restart_g1_ctrl_autostart.sh
-./disable_g1_ctrl_autostart.sh
+bash ./enable_g1_ctrl_autostart.sh
+bash ./enable_g1_ctrl_autostart.sh --delay-seconds 50  # zero-torque mode takes 75 from power-on, system takes ~40s from power-on, So delay 50s
+bash ./restart_g1_ctrl_autostart.sh
+bash ./disable_g1_ctrl_autostart.sh
 ```
 
 You can override the defaults when enabling by setting `NETWORK_INTERFACE` and `JOYSTICK_DEVICE` in the shell before running the enable script.
