@@ -169,10 +169,12 @@ Use these scripts to install or remove a systemd unit that runs `./g1_ctrl --net
 ```bash
 cd deploy/scripts
 ./enable_g1_ctrl_autostart.sh
+./restart_g1_ctrl_autostart.sh
 ./disable_g1_ctrl_autostart.sh
 ```
 
 You can override the defaults when enabling by setting `NETWORK_INTERFACE` and `JOYSTICK_DEVICE` in the shell before running the enable script.
+If the joystick is plugged in after boot or after the service starts, run the restart script to reinitialize joystick access.
 
 ### Robot State Visualization
 
