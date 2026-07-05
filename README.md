@@ -152,6 +152,7 @@ Custom Joystick
 ```bash
 cd ./deploy/robots/g1_29dof/build
 # Use default /dev/input/js0
+./g1_ctrl --network eth0 --custom-joystick
 ./g1_ctrl --network enp5s0 --custom-joystick
 
 # Use a specific device
@@ -160,6 +161,18 @@ cd ./deploy/robots/g1_29dof/build
 # Without the flag — behavior is unchanged (DDS joystick only)
 ./g1_ctrl --network enp5s0
 ```
+
+### Startup Autostart
+
+Use these scripts to install or remove a systemd unit that runs `./g1_ctrl --network eth0 --custom-joystick` at boot:
+
+```bash
+cd deploy/scripts
+./enable_g1_ctrl_autostart.sh
+./disable_g1_ctrl_autostart.sh
+```
+
+You can override the defaults when enabling by setting `NETWORK_INTERFACE` and `JOYSTICK_DEVICE` in the shell before running the enable script.
 
 ### Robot State Visualization
 
