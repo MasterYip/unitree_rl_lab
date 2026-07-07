@@ -152,7 +152,7 @@ Custom Joystick
 ```bash
 cd ./deploy/robots/g1_29dof/build
 # Use default /dev/input/js0
-./g1_ctrl --network eth0 --custom-joystick
+JOYSTICK_TYPE=beitong20 ./g1_ctrl --network eth0 --custom-joystick
 ./g1_ctrl --network enp5s0 --custom-joystick
 
 # Select the mapping for the custom joystick
@@ -173,7 +173,7 @@ Use these scripts to install or remove a systemd unit that runs `./g1_ctrl --net
 ```bash
 cd deploy/scripts
 bash ./enable_g1_ctrl_autostart.sh
-bash ./enable_g1_ctrl_autostart.sh --delay-seconds 50  # zero-torque mode takes 75 from power-on, system takes ~40s from power-on, So delay 50s
+bash ./enable_g1_ctrl_autostart.sh --delay-seconds 50 --joystick-type beitong20  # zero-torque mode takes 75 from power-on, system takes ~40s from power-on, So delay 50s
 bash ./restart_g1_ctrl_autostart.sh
 bash ./disable_g1_ctrl_autostart.sh
 ```
