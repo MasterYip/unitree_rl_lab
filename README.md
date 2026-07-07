@@ -155,6 +155,10 @@ cd ./deploy/robots/g1_29dof/build
 ./g1_ctrl --network eth0 --custom-joystick
 ./g1_ctrl --network enp5s0 --custom-joystick
 
+# Select the mapping for the custom joystick
+JOYSTICK_TYPE=ps5 ./g1_ctrl --network enp5s0 --custom-joystick
+JOYSTICK_TYPE=beitong20 ./g1_ctrl --network enp5s0 --custom-joystick
+
 # Use a specific device
 ./g1_ctrl --network enp5s0 --custom-joystick /dev/input/js1
 
@@ -174,7 +178,16 @@ bash ./restart_g1_ctrl_autostart.sh
 bash ./disable_g1_ctrl_autostart.sh
 ```
 
-You can override the defaults when enabling by setting `NETWORK_INTERFACE` and `JOYSTICK_DEVICE` in the shell before running the enable script.
+You can override the defaults when enabling by setting `NETWORK_INTERFACE`, `JOYSTICK_DEVICE`, and `JOYSTICK_TYPE` in the shell before running the enable script.
+Supported joystick mappings are `xbox`, `ps5`, and `beitong20`.
+
+Examples:
+
+```bash
+JOYSTICK_TYPE=ps5 bash ./enable_g1_ctrl_autostart.sh
+JOYSTICK_TYPE=beitong20 JOYSTICK_DEVICE=/dev/input/js1 bash ./enable_g1_ctrl_autostart.sh --delay-seconds 50
+```
+
 Use `--delay-seconds` when the lower-level controller starts later than this service, so the joystick initialization does not race boot-time ownership.
 If the joystick is plugged in after boot or after the service starts, run the restart script to reinitialize joystick access.
 

@@ -4,6 +4,8 @@
 #pragma once
 
 #include <string>
+#include <cstdlib>
+#include <cctype>
 #include <cmath>
 #include <algorithm>
 #include <spdlog/spdlog.h>
@@ -42,7 +44,7 @@ public:
     ///                built-in Xbox mapping is used.
     explicit CustomJoystick(const std::string& device = "/dev/input/js0",
                             const joystick::JoystickMappingConfig* mapping = nullptr)
-        : parser_(device, mapping ? mapping : &joystick::get_mapping("xbox"))
+        : parser_(device, mapping ? mapping : default_mapping())
     {
         if (!parser_.is_connected()) {
             spdlog::warn("CustomJoystick: failed to open '{}'. "
@@ -50,6 +52,14 @@ public:
         } else {
             spdlog::info("CustomJoystick: reading from '{}'", device);
         }
+    }
+
+    /// @param mapping_name Built-in mapping name such as "xbox", "ps5",
+    ///                     or "beitong20" / "beitong_kp20".
+    explicit CustomJoystick(const std::string& device,
+                            const std::string& mapping_name)
+        : CustomJoystick(device, &joystick::get_mapping(normalize_mapping_name(mapping_name)))
+    {
     }
 
     bool is_connected() const { return parser_.is_connected(); }
@@ -124,6 +134,46 @@ private:
         hi = std::max(hi, raw);
         if (hi - lo < 1.0f) return 0.0f;
         return std::clamp((raw - lo) / (hi - lo), 0.0f, 1.0f);
+    }
+
+    static std::string normalize_mapping_name(std::string mapping_name)
+    {
+        std::transform(mapping_name.begin(), mapping_name.end(), mapping_name.begin(),
+                       [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+        for (char& ch : mapping_name) {
+            if (ch == '-' || ch == ' ') {
+                ch = '_';
+            }
+        }
+
+        if (mapping_name == "beitong20" || mapping_name == "beitongkp20" || mapping_name == "beitong-kp20") {
+            return "beitong_kp20";
+        }
+        if (mapping_name == "xbox360" || mapping_name == "xboxone") {
+            return "xbox";
+        }
+        if (mapping_name == "ps" || mapping_name == "playstation") {
+            return "ps5";
+        }
+
+        return mapping_name;
+    }
+
+    static const joystick::JoystickMappingConfig* default_mapping()
+    {
+        const char* joystick_type = std::getenv("JOYSTICK_TYPE");
+        if (joystick_type == nullptr || *joystick_type == '\0') {
+            return &joystick::get_mapping("xbox");
+        }
+
+        const std::string normalized_type = normalize_mapping_name(joystick_type);
+        try {
+            return &joystick::get_mapping(normalized_type);
+        } catch (const std::exception& error) {
+            spdlog::warn("CustomJoystick: unsupported JOYSTICK_TYPE='{}'. Falling back to Xbox mapping. {}",
+                         joystick_type, error.what());
+            return &joystick::get_mapping("xbox");
+        }
     }
 
     joystick::JoystickParser parser_;
