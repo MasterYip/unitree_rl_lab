@@ -8,6 +8,13 @@ FSM:
       id: 3
       type: RLBase
 
+    Loco_AMP:
+      id: 4
+      type: RLBase
+    Loco_LSTM:
+      id: 5
+      type: RLBase
+
     Mimic_Dance_102: # uncomment to enable
       id: 101
       type: Mimic
@@ -33,9 +40,11 @@ FSM:
       3,3,3,3,3,3,3,  
     ]
   FixStand:
-    transitions: 
+    transitions:
       Passive: LT + B.on_pressed
       Velocity: RB + X.on_pressed
+      Loco_AMP: RB + A.on_pressed
+      Loco_LSTM: RB + B.on_pressed
     kp: [
       100., 100., 100., 150., 40., 40.,
       100., 100., 100., 150., 40., 40.,
@@ -53,21 +62,42 @@ FSM:
     ts: [0, 3]
     qs: [
       [],
-      [ -0.1, 0,0,0.3,-0.2,0,
-        -0.1, 0,0,0.3,-0.2,0,
+      # [ -0.1, 0,0,0.3,-0.2,0,
+      #   -0.1, 0,0,0.3,-0.2,0,
+      #   0,0,0,
+      #   0, 0.25,0,0.97,0.15, 0,0,
+      #   0, -0.25,0,0.97,-0.15, 0,0
+      # ]
+      [ 
+        0, 0,0,0,0.3,0,
+        0, 0,0,0,0.3,0,
         0,0,0,
-        0, 0.25,0,0.97,0.15, 0,0,
-        0, -0.25,0,0.97,-0.15, 0,0
+        0, 0,0,0,0, 0,0,
+        0, 0,0,0,0, 0,0
       ]
     ]
   Velocity:
-    transitions: 
+    transitions:
       Passive: LT + B.on_pressed
+      Loco_AMP: RB + A.on_pressed
+      Loco_LSTM: RB + B.on_pressed
       Mimic_Dance_102: LT + A.on_pressed
       Mimic_Gangnam_Style: LT + Y.on_pressed
 
     policy_dir: config/policy/velocity
     # policy_dir: ../../../logs/rsl_rl/unitree_g1_29dof_velocity
+
+  Loco_AMP:
+    transitions:
+      Passive: LT + B.on_pressed
+      Velocity: RB + X.on_pressed
+    policy_dir: config/policy/amp
+
+  Loco_LSTM:
+    transitions:
+      Passive: LT + B.on_pressed
+      Velocity: RB + X.on_pressed
+    policy_dir: config/policy/loco
   Mimic_Dance_102:
     transitions: 
       Passive: LT + B.on_pressed

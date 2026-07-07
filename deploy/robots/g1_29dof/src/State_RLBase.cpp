@@ -33,7 +33,7 @@ REGISTER_OBSERVATION(keyboard_velocity_commands)
 }
 
 State_RLBase::State_RLBase(int state_mode, std::string state_string)
-: FSMState(state_mode, state_string) 
+: FSMState(state_mode, state_string)
 {
     auto cfg = param::config["FSM"][state_string];
     auto policy_dir = param::parser_policy_dir(cfg["policy_dir"].as<std::string>());
@@ -42,7 +42,20 @@ State_RLBase::State_RLBase(int state_mode, std::string state_string)
         YAML::LoadFile(policy_dir / "params" / "deploy.yaml"),
         std::make_shared<unitree::BaseArticulation<LowState_t::SharedPtr>>(FSMState::lowstate)
     );
-    env->alg = std::make_unique<isaaclab::OrtRunner>(policy_dir / "exported" / "policy.onnx");
+
+    // Auto-detect LSTM model: if the ONNX model has >1 input, use OrtRunnerLSTM
+    {
+        Ort::Env detect_env(ORT_LOGGING_LEVEL_WARNING, "detect_model");
+        Ort::SessionOptions detect_opts;
+        auto session = std::make_unique<Ort::Session>(detect_env,
+            (policy_dir / "exported" / "policy.onnx").c_str(), detect_opts);
+        if (session->GetInputCount() > 1) {
+            spdlog::info("Detected LSTM model ({} inputs), using OrtRunnerLSTM", session->GetInputCount());
+            env->alg = std::make_unique<isaaclab::OrtRunnerLSTM>(policy_dir / "exported" / "policy.onnx");
+        } else {
+            env->alg = std::make_unique<isaaclab::OrtRunner>(policy_dir / "exported" / "policy.onnx");
+        }
+    }
 
     this->registered_checks.emplace_back(
         std::make_pair(
