@@ -147,6 +147,13 @@ You can use this program to control the robot directly, but make sure the on-bor
 ./g1_ctrl --network eth0 # eth0 is the network interface name.
 ```
 
+If you see `The other process is using the lowcmd channel`, stop the existing controller or simulator first:
+
+```bash
+cd deploy/scripts
+bash ./kill_lowcmd_channel.sh --force
+```
+
 Custom Joystick
 
 ```bash
