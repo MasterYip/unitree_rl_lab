@@ -57,6 +57,10 @@
  *  |         | dpad_x, dpad_y            | select, start, mode, l3, r3, |
  *  |         |                           | touchpad, mic                |
  *  +---------+---------------------------+-------------------------------+
+ *  |"beitong | left_x, left_y, right_x,  | south, east, share, west,    |
+ *  | _kp20"  | right_y, r2, l2,          | north, turbo, l1, r1, mode,  |
+ *  |         | dpad_x, dpad_y            | m1, select, start, m2, l3, r3|
+ *  +---------+---------------------------+-------------------------------+
  *
  *  See the ``AxisMapping`` / ``ButtonMapping`` tables below for the exact
  *  physical-number → logical-name assignments.
@@ -111,6 +115,7 @@
 #include <fcntl.h>
 #include <linux/joystick.h>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <unistd.h>
 #include <vector>
@@ -228,6 +233,42 @@ inline const JoystickMappingConfig& xbox_mapping() {
     return m;
 }
 
+/// Beitong Kunpeng 20 (北通鲲鹏20) — KP20-specific layout.
+inline const JoystickMappingConfig& beitong_kp20_mapping() {
+    static const JoystickMappingConfig m = [] {
+        JoystickMappingConfig c("Beitong Kunpeng 20 (北通鲲鹏20)", 1);
+        c.axes = {
+            {0, "left_x",  -32768, 32767},
+            {1, "left_y",  -32768, 32767},
+            {2, "right_x", -32768, 32767},
+            {3, "right_y", -32768, 32767},
+            {4, "r2",           0,   255},
+            {5, "l2",           0,   255},
+            {6, "dpad_x",      -1,     1},
+            {7, "dpad_y",      -1,     1},
+        };
+        c.buttons = {
+            {0,  "south"},
+            {1,  "east"},
+            {2,  "share"},
+            {3,  "west"},
+            {4,  "north"},
+            {5,  "turbo"},
+            {6,  "l1"},
+            {7,  "r1"},
+            {8,  "mode"},
+            {9,  "m1"},
+            {10, "select"},
+            {11, "start"},
+            {12, "m2"},
+            {13, "l3"},
+            {14, "r3"},
+        };
+        return c;
+    }();
+    return m;
+}
+
 /// PS5 DualSense (hid-playstation) mapping.
 inline const JoystickMappingConfig& ps5_mapping() {
     static const JoystickMappingConfig m = [] {
@@ -267,7 +308,7 @@ inline const JoystickMappingConfig& ps5_mapping() {
 /// Resolve a mapping identifier.
 ///
 /// Resolution order:
-/// 1. Built-in names: ``"xbox"``, ``"ps5"``
+/// 1. Built-in names: ``"xbox"``, ``"ps5"``, ``"beitong_kp20"``
 /// 2. (Future) filesystem path to a ``.yaml`` file
 ///
 /// Returns a reference to a static, never-dangling mapping.
@@ -277,11 +318,13 @@ inline const JoystickMappingConfig& get_mapping(const std::string & identifier) 
         return xbox_mapping();
     if (identifier == "ps5" || identifier == "ps" || identifier == "playstation")
         return ps5_mapping();
+    if (identifier == "beitong_kp20")
+        return beitong_kp20_mapping();
 
     // Fallback: treat as a file path stub (YAML support not yet implemented).
     throw std::runtime_error(
         "joystick::get_mapping: unknown mapping '" + identifier + "'.  "
-        "Built-in choices: \"xbox\", \"ps5\".");
+        "Built-in choices: \"xbox\", \"ps5\", \"beitong_kp20\".");
 }
 
 // =========================================================================
