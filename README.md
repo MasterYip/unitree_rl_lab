@@ -154,6 +154,15 @@ cd deploy/scripts
 bash ./kill_lowcmd_channel.sh --force
 ```
 
+To check which process is using the DDS port before killing it, run the script in dry-run mode or inspect the UDP sockets directly:
+
+```bash
+cd deploy/scripts
+bash ./kill_lowcmd_channel.sh --dry-run
+ss -uapn | grep -E '7400|7401'
+lsof -nP -iUDP | grep -E '7400|7401'
+```
+
 Custom Joystick
 
 ```bash
